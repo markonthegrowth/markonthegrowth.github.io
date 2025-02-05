@@ -1,1 +1,0 @@
-# markonthegrowth.github.io
