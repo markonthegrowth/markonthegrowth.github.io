@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Activity Tracker</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      padding: 0;
+      background-color: #f9f9f9;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .question {
+      font-size: 18px;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    .answer {
+      margin-top: 10px;
+    }
+    button {
+      padding: 10px 15px;
+      margin-top: 10px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:disabled {
+      background-color: #ddd;
+    }
+    ul {
+      list-style-type: none;
+      padding: 0;
+    }
+    li {
+      margin: 10px 0;
+      padding: 10px;
+      background: #f1f1f1;
+      border-radius: 5px;
+    }
+    .summary {
+      margin-top: 20px;
+      background-color: #f4f4f4;
+      padding: 15px;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Activity Tracker</h1>
+    <div class="question" id="question">질문이 표시됩니다.</div>
+    <button id="startBtn">질문 시작</button>
+    <button id="stopBtn" disabled>녹음 중지</button>
+    <button id="resetBtn" style="display: none;">처음부터 다시 시작</button>
+    <div class="answer" id="answer">녹음된 답변이 표시됩니다.</div>
+    <h2>활동 기록</h2>
+    <ul id="activityList"></ul>
+    <div class="summary" id="summary" style="display: none;"></div>
+  </div>
+
+  <script>
+    const questions = [
+      "지난 시간 동안 어떤 업무를 하셨나요?",
+      "주로 어떤 앱을 사용하셨나요?",
+      "특별히 어려웠던 점이 있었나요?",
+      "개선이 필요한 부분이 있었나요?"
+    ];
+
+    let currentQuestionIndex = 0;
+    let recognition;
+    let temporaryAnswer = ""; // 임시 응답 저장
+    let responses = {};
+    const activityList = document.getElementById("activityList");
+
+    document.getElementById("startBtn").addEventListener("click", handleStart);
+    document.getElementById("stopBtn").addEventListener("click", stopVoiceRecord);
+    document.getElementById("resetBtn").addEventListener("click", resetApp);
+
+    function handleStart() {
+      if (currentQuestionIndex >= questions.length) {
+        showSummary();
+        return;
+      }
+
+      if (!recognition) initRecognition(); // 최초 질문 시 마이크 권한 요청
+
+      document.getElementById("question").textContent = questions[currentQuestionIndex];
+      startVoiceRecord();
+
+      // 버튼 상태 변경
+      document.getElementById("startBtn").textContent =
+        currentQuestionIndex < questions.length - 1 ? "다음 질문" : "기록 종료";
+      document.getElementById("startBtn").disabled = true;
+      document.getElementById("stopBtn").disabled = false;
+    }
+
+    function initRecognition() {
+      recognition = new webkitSpeechRecognition();
+      recognition.lang = "ko-KR";
+      recognition.continuous = true; // 계속 녹음
+      recognition.interimResults = false;
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[event.results.length - 1][0].transcript; // 마지막 결과
+        temporaryAnswer += transcript + " ";
+        document.getElementById("answer").textContent = `응답: ${temporaryAnswer.trim()}`;
+      };
+
+      recognition.onerror = (event) => {
+        console.error("음성 인식 오류:", event.error);
+        alert("음성 인식 중 오류가 발생했습니다.");
+      };
+    }
+
+    function startVoiceRecord() {
+      temporaryAnswer = ""; // 새로운 질문 시작 시 초기화
+      recognition.start();
+    }
+
+    function stopVoiceRecord() {
+      recognition.stop();
+      if (temporaryAnswer.trim() !== "") {
+        addActivity(questions[currentQuestionIndex], temporaryAnswer.trim());
+        responses[questions[currentQuestionIndex]] = temporaryAnswer.trim(); // 최종 응답 저장
+      }
+
+      currentQuestionIndex++;
+      document.getElementById("startBtn").disabled = false;
+      document.getElementById("stopBtn").disabled = true;
+
+      if (currentQuestionIndex >= questions.length) {
+        document.getElementById("startBtn").textContent = "기록 종료";
+      }
+    }
+
+    function addActivity(question, answer) {
+      const existingItem = [...activityList.children].find((li) =>
+        li.textContent.startsWith(question)
+      );
+      if (existingItem) {
+        existingItem.textContent = `${question} - ${answer}`;
+      } else {
+        const li = document.createElement("li");
+        li.textContent = `${question} - ${answer}`;
+        activityList.appendChild(li);
+      }
+    }
+
+    function showSummary() {
+      document.getElementById("summary").style.display = "block";
+      const summaryDiv = document.getElementById("summary");
+      summaryDiv.innerHTML = "<h3>활동 요약</h3>";
+      Object.keys(responses).forEach((question) => {
+        const p = document.createElement("p");
+        p.textContent = `${question}: ${responses[question]}`;
+        summaryDiv.appendChild(p);
+      });
+
+      document.getElementById("startBtn").style.display = "none";
+      document.getElementById("stopBtn").style.display = "none";
+      document.getElementById("resetBtn").style.display = "block";
+    }
+
+    function resetApp() {
+      currentQuestionIndex = 0;
+      responses = {};
+      temporaryAnswer = "";
+      document.getElementById("activityList").innerHTML = "";
+      document.getElementById("summary").style.display = "none";
+      document.getElementById("startBtn").textContent = "질문 시작";
+      document.getElementById("startBtn").style.display = "inline-block";
+      document.getElementById("stopBtn").style.display = "inline-block";
+      document.getElementById("resetBtn").style.display = "none";
+      document.getElementById("answer").textContent = "녹음된 답변이 표시됩니다.";
+      document.getElementById("question").textContent = "질문이 표시됩니다.";
+    }
+  </script>
+</body>
+</html>
